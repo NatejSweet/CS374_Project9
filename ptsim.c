@@ -48,19 +48,36 @@ unsigned char get_page_table(int proc_num)
 //
 void new_process(int proc_num, int page_count)
 {
-    int page_table;
-    for (int i = 1; i <= page_count; i++)
+    for (int i = 0 ; i < PAGE_COUNT; i++) // memory for process page table
     {
-        for (int i = 1; i < PAGE_COUNT; i++)
+        int addr = get_address(0, i);
+        if (mem[addr] == 0)
         {
-            if (mem[get_address(0, i)] == 0)
+            mem[addr] = 1;
+            mem[get_address(0, PTP_OFFSET + proc_num)] = i;
+            break;
+        }
+        if (i == PAGE_COUNT - 1)
+        {
+             printf("OOM: proc %d: page table\n", proc_num);
+            return;
+        }
+    }
+    for (int i = 0; i < page_count; i++)    // memory for process data pages
+    {
+        for (int j = 0; j < PAGE_COUNT; j++)
+        {
+            int addr = get_address(0, j);
+            if (mem[addr] == 0)
             {
-                page_table = i;
-
-                int ptp_addr = get_address(0, PTP_OFFSET + proc_num);
-                mem[ptp_addr] = page_table;
-                mem[get_address(0, i)] = 1;
+                mem[addr] = 1;
+                mem[get_address(get_page_table(proc_num), i)] = j;
                 break;
+            }
+            if (j == PAGE_COUNT - 1)
+            {
+                printf("OOM: proc %d: data page\n", proc_num);
+                return;
             }
         }
     }
@@ -142,8 +159,8 @@ int main(int argc, char *argv[])
         {
             int proc_num = atoi(argv[++i]);
             int page_count = atoi(argv[++i]);
-            printf("New process %d with %d pages\n", proc_num, page_count);
             new_process(proc_num, page_count);
+
         }
 
         // TODO: more command line arguments
