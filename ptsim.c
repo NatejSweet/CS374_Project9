@@ -46,9 +46,8 @@ unsigned char get_page_table(int proc_num)
 //
 // This includes the new process page table and page_count data pages.
 //
-void new_process(int proc_num, int page_count)
-{
-    for (int i = 0 ; i < PAGE_COUNT; i++) // memory for process page table
+void new_process_page_table(int proc_num){
+    for (int i = 0 ; i < PAGE_COUNT; i++)//makes 1
     {
         int addr = get_address(0, i);
         if (mem[addr] == 0)
@@ -59,11 +58,14 @@ void new_process(int proc_num, int page_count)
         }
         if (i == PAGE_COUNT - 1)
         {
-             printf("OOM: proc %d: page table\n", proc_num);
+            printf("OOM: proc %d: page table\n", proc_num);
             return;
         }
     }
-    for (int i = 0; i < page_count; i++)    // memory for process data pages
+}
+
+void new_process_data_pages(int proc_num, int page_count){
+    for (int i = 0; i < page_count; i++) // makes as many as defined
     {
         for (int j = 0; j < PAGE_COUNT; j++)
         {
@@ -82,6 +84,11 @@ void new_process(int proc_num, int page_count)
         }
     }
 }
+void new_process(int proc_num, int page_count)
+{
+    new_process_page_table(proc_num);
+    new_process_data_pages(proc_num, page_count);
+}
 
 //
 // Print the free page map
@@ -97,6 +104,7 @@ void print_page_free_map(void)
         int addr = get_address(0, i);
 
         printf("%c", mem[addr] == 0 ? '.' : '#');
+        
 
         if ((i + 1) % 16 == 0)
             putchar('\n');
@@ -127,6 +135,14 @@ void print_page_table(int proc_num)
             printf("%02x -> %02x\n", i, page);
         }
     }
+}
+
+int get_phys_addr(int proc_num, int virt_addr){ //get physical address from virtual address
+    int proc_table = get_page_table(proc_num);
+    int virt_page = virt_addr >> PAGE_SHIFT;
+    int phys_page = mem[get_address(proc_table, virt_page)];
+    int offset = virt_addr & (PAGE_SIZE - 1);
+    return get_address(phys_page, offset);
 }
 
 //
@@ -161,8 +177,33 @@ int main(int argc, char *argv[])
             int page_count = atoi(argv[++i]);
             new_process(proc_num, page_count);
 
+        }else if (strcmp(argv[i], "kp") == 0)
+        {
+            int proc_num = atoi(argv[++i]); 
+            int page_table = get_page_table(proc_num);
+            for (int i = 0; i < PAGE_COUNT; i++) {  //free data pages
+                int addr = get_address(page_table, i);
+                int page = mem[addr];
+                if (page != 0) {
+                    mem[page] = 0;
+                }
+            }
+            int process_page = mem[get_address(0, proc_num + PTP_OFFSET)]; //free page table
+            mem[process_page] = 0;
+        }else if (strcmp(argv[i], "sb") == 0 ) //sb n a b, n is process number, a is virtual page number, b is value to store
+        {
+            int proc_num = atoi(argv[++i]);
+            int page_num = atoi(argv[++i]);
+            int value = atoi(argv[++i]);
+            int addr = get_phys_addr(proc_num, page_num);
+            mem[addr] = value;
+            printf("Stored proc %d: %d=> %d, value=%d\n", proc_num, page_num, addr, value);
+        }else if (strcmp(argv[i], "lb") == 0) //lb n a, n is process number, a is virtual page number
+        {
+            int proc_num = atoi(argv[++i]);
+            int page_num = atoi(argv[++i]);
+            int addr = get_phys_addr(proc_num, page_num);
+            printf("Load proc %d: %d=> %d, value=%d\n", proc_num, page_num, addr, mem[addr]);
         }
-
-        // TODO: more command line arguments
     }
 }
